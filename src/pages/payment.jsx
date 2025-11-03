@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useCart } from '../context/CartContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectCart, selectOrderSummary, clearCart } from '../redux/cartSlice';
+import { useNavigate } from 'react-router-dom';
 import cod from '../assets/cod.png';
 
 function Payment() {
-  const { cart, getOrderSummary } = useCart();
-  const summary = getOrderSummary();
+  const cart = useSelector(selectCart);
+  const summary = useSelector(selectOrderSummary);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [address, setAddress] = useState({
     name: '',
     street: '',
@@ -27,6 +31,7 @@ function Payment() {
     'Brazil'
   ];
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [pendingPaymentMethod, setPendingPaymentMethod] = useState('');
   const [voucher, setVoucher] = useState('');
   const [discount, setDiscount] = useState(0);
   const [cardDetails, setCardDetails] = useState({
@@ -55,6 +60,9 @@ function Payment() {
   });
   const [showAddressForm, setShowAddressForm] = useState(savedAddresses.length === 0);
   const [editingAddress, setEditingAddress] = useState(null);
+  const [isAddressValid, setIsAddressValid] = useState(savedAddresses.length > 0);
+  const [isPaymentValid, setIsPaymentValid] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const total = subtotal + summary.shipping + summary.tax - summary.discount - discount;
@@ -66,8 +74,23 @@ function Payment() {
       const parsedAddresses = JSON.parse(addresses);
       setSavedAddresses(parsedAddresses);
       setShowAddressForm(parsedAddresses.length === 0);
+      setIsAddressValid(parsedAddresses.length > 0);
     }
   }, []);
+
+  // Update payment validity when payment method changes
+  useEffect(() => {
+    if (paymentMethod === 'cod') {
+      setIsPaymentValid(true);
+    } else if (paymentMethod === 'credit' || paymentMethod === 'debit') {
+      setIsPaymentValid(cardDetails.number && cardDetails.expiry && cardDetails.cvv && cardDetails.name &&
+                       !paymentErrors.number && !paymentErrors.expiry && !paymentErrors.cvv && !paymentErrors.name);
+    } else if (paymentMethod === 'upi') {
+      setIsPaymentValid(upiId.trim() !== '');
+    } else {
+      setIsPaymentValid(false);
+    }
+  }, [paymentMethod, cardDetails, upiId, paymentErrors]);
 
   const validateField = (name, value) => {
     switch (name) {
@@ -98,11 +121,11 @@ function Payment() {
         if (value && !/^\d{16}$/.test(value)) return 'Card Number must be exactly 16 digits';
         break;
       case 'expiry':
-        if (value && !/^(0[1-9]|1[0-2])\/\d{2}$/.test(value)) return 'Expiry Date must be in MM/YY format';
+        if (value && !/^(0[1-9]|1[0-2])\/\d{4}$/.test(value)) return 'Expiry Date must be in MM/YYYY format';
         if (value) {
           const [month, year] = value.split('/');
           const currentDate = new Date();
-          const currentYear = currentDate.getFullYear() % 100;
+          const currentYear = currentDate.getFullYear();
           const currentMonth = currentDate.getMonth() + 1;
           const expYear = parseInt(year, 10);
           const expMonth = parseInt(month, 10);
@@ -143,21 +166,36 @@ function Payment() {
   };
 
   const handleContinue = () => {
-    if (!address.name || !address.street || !address.city || !address.state || !address.zip || !address.country || !paymentMethod) {
-      alert('Please fill in all required fields');
+    if (!isAddressValid) {
+      alert('Please provide a valid delivery address');
       return;
     }
-    if ((paymentMethod === 'credit' || paymentMethod === 'debit') &&
-        (!cardDetails.number || !cardDetails.expiry || !cardDetails.cvv || !cardDetails.name)) {
-      alert('Please fill in all card details');
-      return;
-    }
-    if (paymentMethod === 'upi' && !upiId) {
-      alert('Please enter your UPI ID');
+    if (!isPaymentValid) {
+      alert('Please select and complete a valid payment method');
       return;
     }
     // In real app, this would process payment
-    alert('Order placed successfully!');
+    const orderData = {
+      id: `ORD-${Date.now()}`,
+      date: new Date().toLocaleDateString(),
+      items: cart.map(item => ({
+        id: item.id,
+        title: item.title,
+        quantity: item.quantity,
+        price: item.price,
+        thumbnail: item.thumbnail
+      })),
+      total: total,
+      status: 'Processing'
+    };
+    const existingOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+    existingOrders.push(orderData);
+    localStorage.setItem('orders', JSON.stringify(existingOrders));
+    dispatch(clearCart());
+    setShowSuccessModal(true);
+    setTimeout(() => {
+      navigate('/account', { state: { activeSection: 'orders' } });
+    }, 3000);
   };
 
   return (
@@ -318,6 +356,7 @@ function Payment() {
                     setShowAddressForm(false);
                     setEditingAddress(null);
                     setAddress({ name: '', street: '', city: '', state: '', zip: '', country: '' });
+                    setIsAddressValid(true);
                   }}
                   className="flex-1 bg-green-600 text-white py-2 rounded-md hover:bg-green-700"
                 >
@@ -351,9 +390,12 @@ function Payment() {
                   type="radio"
                   name="payment"
                   value="credit"
+                  checked={paymentMethod === 'credit'}
                   onChange={(e) => {
-                    setPaymentMethod(e.target.value);
+                    setPendingPaymentMethod(e.target.value);
                     setModalType('card');
+                    setCardDetails({ number: '', expiry: '', cvv: '', name: '' });
+                    setPaymentErrors({ number: '', expiry: '', cvv: '', name: '' });
                     setShowModal(true);
                   }}
                   className="mr-3"
@@ -370,9 +412,12 @@ function Payment() {
                   type="radio"
                   name="payment"
                   value="debit"
+                  checked={paymentMethod === 'debit'}
                   onChange={(e) => {
-                    setPaymentMethod(e.target.value);
+                    setPendingPaymentMethod(e.target.value);
                     setModalType('card');
+                    setCardDetails({ number: '', expiry: '', cvv: '', name: '' });
+                    setPaymentErrors({ number: '', expiry: '', cvv: '', name: '' });
                     setShowModal(true);
                   }}
                   className="mr-3"
@@ -389,9 +434,11 @@ function Payment() {
                   type="radio"
                   name="payment"
                   value="upi"
+                  checked={paymentMethod === 'upi'}
                   onChange={(e) => {
-                    setPaymentMethod(e.target.value);
+                    setPendingPaymentMethod(e.target.value);
                     setModalType('upi');
+                    setUpiId('');
                     setShowModal(true);
                   }}
                   className="mr-3"
@@ -408,6 +455,7 @@ function Payment() {
                   type="radio"
                   name="payment"
                   value="cod"
+                  checked={paymentMethod === 'cod'}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                   className="mr-3"
                 />
@@ -556,7 +604,7 @@ function Payment() {
                   <div>
                     <input
                       type="text"
-                      placeholder="Expiry Date (MM/YY)"
+                      placeholder="Expiry Date (MM/YYYY)"
                       value={cardDetails.expiry}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -616,7 +664,10 @@ function Payment() {
             )}
             <div className="flex justify-end gap-4 mt-6">
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  setPendingPaymentMethod('');
+                }}
                 className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400"
               >
                 Cancel
@@ -633,14 +684,37 @@ function Payment() {
                       setPaymentErrors({ ...paymentErrors, ...errors });
                       return;
                     }
+                  } else if (modalType === 'upi') {
+                    if (!upiId) {
+                      alert('Please enter your UPI ID');
+                      return;
+                    }
                   }
+                  setPaymentMethod(pendingPaymentMethod);
                   setShowModal(false);
+                  setPendingPaymentMethod('');
                 }}
                 className="px-4 py-2 bg-red-800 text-white rounded-md hover:bg-red-900"
               >
                 Save
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <h2 className="text-2xl font-bold mb-4 text-green-600">Order Placed Successfully!</h2>
+            <p className="mb-4">Thank you for your purchase. Your order has been confirmed and will be processed shortly.</p>
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="w-full bg-green-600 text-white py-2 rounded-md hover:bg-green-700"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

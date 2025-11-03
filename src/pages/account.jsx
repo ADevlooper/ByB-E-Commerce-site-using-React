@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useCart } from '../context/CartContext';
-import { useNavigate } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectWishlist, toggleWishlist } from '../redux/wishlistSlice';
+import { useNavigate, useLocation } from 'react-router-dom';
 import AsideMenu, { LayoutPanelLeftIcon } from '../components/AsideMenu';
 
 const Account = () => {
-  const [activeSection, setActiveSection] = useState('profile');
+  const location = useLocation();
+  const [activeSection, setActiveSection] = useState(location.state?.activeSection || 'profile');
   const [wishlistProducts, setWishlistProducts] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -12,7 +14,8 @@ const Account = () => {
     email: 'john.doe@example.com',
     phone: '+1 (555) 123-4567'
   });
-  const { wishlist, toggleWishlist } = useCart();
+  const wishlist = useSelector(selectWishlist);
+  const dispatch = useDispatch();
   const [isAsideOpen, setIsAsideOpen] = useState(false);
   const navigate = useNavigate();
   const [settings, setSettings] = useState({
@@ -30,7 +33,7 @@ const Account = () => {
   const [paymentMethods, setPaymentMethods] = useState([
     { id: 1, type: 'debit', number: '****1234', expiry: '12/25', bank: 'HDFC Bank' },
     { id: 2, type: 'credit', number: '****5678', expiry: '08/26', bank: 'ICICI Bank' },
-    { id: 3, type: 'upi', id: 'user@upi', provider: 'Google Pay' }
+    { id: 3, type: 'upi', upiId: 'user@upi', provider: 'Google Pay' }
   ]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMethod, setEditingMethod] = useState(null);
@@ -57,6 +60,7 @@ const Account = () => {
     zip: '',
     phone: ''
   });
+  const [orders, setOrders] = useState([]);
 
   const getHeaderText = () => {
     switch (activeSection) {
@@ -94,7 +98,7 @@ const Account = () => {
     fetchWishlistProducts();
   }, [wishlist]);
 
-  // Load addresses and payment methods from localStorage on mount
+  // Load addresses, payment methods, and orders from localStorage on mount
   useEffect(() => {
     const savedAddresses = localStorage.getItem('addresses');
     if (savedAddresses) {
@@ -104,6 +108,18 @@ const Account = () => {
     const savedPaymentMethods = localStorage.getItem('paymentMethods');
     if (savedPaymentMethods) {
       setPaymentMethods(JSON.parse(savedPaymentMethods));
+    }
+
+    const savedOrders = localStorage.getItem('orders');
+    if (savedOrders) {
+      let orders = JSON.parse(savedOrders);
+      // Remove any mock or old orders, keep only real orders with ORD- prefix
+      orders = orders.filter(order => typeof order.id === 'string' && order.id.startsWith('ORD-'));
+      setOrders(orders);
+      // Update localStorage to remove mock orders
+      localStorage.setItem('orders', JSON.stringify(orders));
+    } else {
+      setOrders([]);
     }
   }, []);
 
@@ -115,7 +131,7 @@ const Account = () => {
     { id: 'payment', label: 'Payment Methods', icon: 'https://img.icons8.com/fluency/48/bank-card-back-side.png' },
     { id: 'settings', label: 'Settings', icon: 'https://img.icons8.com/fluency/48/settings.png' },
     { id: 'help', label: 'Get Help', icon: 'https://img.icons8.com/fluency/48/help.png' },
-    { id: 'Account', label: 'Account', icon: 'https://img.icons8.com/fluency/48/exit.png' },
+    { id: 'logout', label: 'Logout', icon: 'https://img.icons8.com/fluency/48/exit.png' },
   ];
 
   const handleEditToggle = () => {
@@ -304,7 +320,50 @@ const Account = () => {
         return (
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h1 className="text-3xl font-bold text-red-800 text-left mb-6">{getHeaderText()}</h1>
-            <p className="text-gray-600">You haven't placed any orders yet.</p>
+            {orders.length === 0 ? (
+              <p className="text-gray-600">You haven't placed any orders yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {orders.map((order) => (
+                  <div key={order.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <p className="text-sm text-gray-500">Placed on {order.date}</p>
+                      </div>
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
+                        order.status === 'Shipped' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {order.status}
+                      </span>
+                    </div>
+                    <div className="space-y-2 mb-4">
+                      {order.items.map((item) => (
+                        <div key={item.id} className="flex items-center gap-3">
+                          <img
+                            src={item.thumbnail}
+                            alt={item.title}
+                            className="w-12 h-12 object-contain rounded"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{item.title}</p>
+                            <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+                          </div>
+                          <p className="font-semibold text-red-800">${item.price * item.quantity}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+                      <p className="font-medium">Total: <span className="text-red-800">${order.total}</span></p>
+                      <button className="text-blue-500 hover:text-blue-700 text-sm">
+                        View Details
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       case 'wishlist':
@@ -329,7 +388,7 @@ const Account = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleWishlist(product.id);
+                            dispatch(toggleWishlist(product.id));
                           }}
                           className="mt-2 text-red-500 hover:text-red-700 text-sm"
                         >
@@ -646,7 +705,7 @@ const Account = () => {
 
       <div className="flex flex-col md:flex-row gap-8">
         {/* Aside Menu */}
-  <aside className="hidden md:block md:w-1/4">
+  <aside className="hidden md:block md:w-1/4 sticky top-0">
           <div className="bg-white md:h-[80vh] p-4 rounded-lg shadow-md">
             <nav>
               <ul className="space-y-2">

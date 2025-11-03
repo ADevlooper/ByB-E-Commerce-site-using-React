@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useCart } from '../context/CartContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { addToCart } from '../redux/cartSlice';
+import { toggleWishlist, selectWishlist } from '../redux/wishlistSlice';
 import { Link, useNavigate } from 'react-router-dom';
 import Toaster from '../components/toaster';
 import Loader from '../components/Loader';
@@ -44,7 +46,8 @@ function Products() {
   const [toast, setToast] = useState(null);
 
   const navigate = useNavigate();
-  const { addToCart, toggleWishlist, isInWishlist } = useCart();
+  const dispatch = useDispatch();
+  const wishlist = useSelector(selectWishlist);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -104,20 +107,22 @@ function Products() {
 
   const handleAddToCart = (e, product) => {
     e.preventDefault(); // Prevent navigation when clicking the button
-    addToCart({ ...product, quantity: 1 });
+    dispatch(addToCart({ ...product, quantity: 1 }));
     setToast(`${product.title} added to cart!`);
   };
 
   const handleBuyNow = (e, product) => {
     e.preventDefault(); // Prevent navigation
-    addToCart({ ...product, quantity: 1 });
+    dispatch(addToCart({ ...product, quantity: 1 }));
     navigate('/payment');
   };
 
   const handleToggleWishlist = (e, productId) => {
     e.preventDefault(); // Prevent navigation
-    toggleWishlist(productId);
+    dispatch(toggleWishlist(productId));
   };
+
+  const isInWishlist = (productId) => wishlist.includes(productId);
 
   return (
     <div className="container mx-auto px-8 py-8">

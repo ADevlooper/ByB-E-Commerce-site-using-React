@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { addToCart } from '../redux/cartSlice';
+import { toggleWishlist, selectWishlist } from '../redux/wishlistSlice';
 import Toaster from '../components/toaster';
 import Loader from '../components/Loader';
 
@@ -32,7 +34,8 @@ function ProductDetail() {
 
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToCart, toggleWishlist, isInWishlist } = useCart();
+  const dispatch = useDispatch();
+  const wishlist = useSelector(selectWishlist);
 
   // Category check functions
   const isFurniture = (category) => ['furniture', 'home-decoration'].includes(category?.toLowerCase());
@@ -90,7 +93,7 @@ function ProductDetail() {
       ...(isPerfume(product.category) && { selectedFlavor })
     };
 
-    addToCart(productWithOptions);
+    dispatch(addToCart(productWithOptions));
     navigate('/payment');
   };
 
@@ -105,7 +108,7 @@ function ProductDetail() {
       ...(isPerfume(product.category) && { selectedFlavor })
     };
 
-    addToCart(productWithOptions);
+    dispatch(addToCart(productWithOptions));
     setToast(`${product.title} added to cart!`);
   };
 
@@ -165,12 +168,12 @@ function ProductDetail() {
             <button
               onClick={(e) => {
                 e.preventDefault();
-                toggleWishlist(product.id);
+                dispatch(toggleWishlist(product.id));
               }}
               className="absolute top-2 right-2 bg-white bg-opacity-80 hover:bg-opacity-100 p-2 rounded-full shadow-md transition-all duration-200"
             >
               <svg
-                className={`w-5 h-5 ${isInWishlist(product.id) ? 'text-red-500 fill-current' : 'text-gray-400'}`}
+                className={`w-5 h-5 ${wishlist.includes(product.id) ? 'text-red-500 fill-current' : 'text-gray-400'}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

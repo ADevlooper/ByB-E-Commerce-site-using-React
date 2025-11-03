@@ -1,6 +1,5 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { CartProvider } from './context/CartContext';
 import Navbar from './components/navbar';
 import Adcorousel from './components/adcorousel';
 import Shortmenu from './components/shortmenu';
@@ -13,7 +12,7 @@ import Account from './pages/account';
 import Footer from './components/footer';
 import GoToTop from './components/gototop';
 import ProductDetail from './pages/ProductDetail';
-import DealsForYou from './components/DealsForYou';
+import DealsForYou from './components/dealsForYou';
 import ScrollToTop from './components/ScrollToTop';
 import './App.css';
 
@@ -27,7 +26,7 @@ const Home = () => (
 
 function App() {
   return (
-    <CartProvider>
+    <>
       <ScrollToTop />
       <div className="App">
         <Navbar />
@@ -44,7 +43,7 @@ function App() {
         <Footer />
         <GoToTop />
       </div>
-    </CartProvider>
+    </>
   );
 }
 

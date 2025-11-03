@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useCart } from '../context/CartContext';
-import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { addToCart } from '../redux/cartSlice';
+import { Link } from 'react-router-dom';
 import Toaster from './toaster';
 import Loader from './Loader';
+import WishlistButton from './WishlistButton';
 
 function DealsForYou() {
   const [products, setProducts] = useState([]);
@@ -10,8 +12,7 @@ function DealsForYou() {
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const navigate = useNavigate();
-  const { addToCart, toggleWishlist, isInWishlist } = useCart();
+  const dispatch = useDispatch();
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -47,20 +48,11 @@ function DealsForYou() {
 
   const handleAddToCart = (e, product) => {
     e.preventDefault();
-    addToCart({ ...product, quantity: 1 });
+    dispatch(addToCart({ ...product, quantity: 1 }));
     setToast(`${product.title} added to cart!`);
   };
 
-  const handleBuyNow = (e, product) => {
-    e.preventDefault();
-    addToCart({ ...product, quantity: 1 });
-    navigate('/payment');
-  };
 
-  const handleToggleWishlist = (e, productId) => {
-    e.preventDefault();
-    toggleWishlist(productId);
-  };
 
   return (
     <div className="container mt-6 px-8 py-8">
@@ -95,6 +87,7 @@ function DealsForYou() {
                 </div>
               </div>
             </Link>
+
           </div>
         ))}
       </div>

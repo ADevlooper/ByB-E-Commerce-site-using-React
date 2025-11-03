@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useCart } from '../context/CartContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectCart, selectOrderSummary, removeFromCart, updateQuantity } from '../redux/cartSlice';
 import { Link, useNavigate } from 'react-router-dom';
 import Toaster from '../components/toaster';
 
 function Cart() {
-  const { cart, removeFromCart, updateQuantity, getOrderSummary } = useCart();
-  const summary = getOrderSummary();
+  const dispatch = useDispatch();
+  const cart = useSelector(selectCart);
+  const summary = useSelector(selectOrderSummary);
   const navigate = useNavigate();
   const [toaster, setToaster] = useState(null);
 
@@ -47,14 +49,14 @@ function Cart() {
                     <div className="flex items-center gap-4 mt-2 mb-4">
                       <div className="flex items-center border rounded">
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          onClick={() => dispatch(updateQuantity({ productId: item.id, newQuantity: item.quantity - 1 }))}
                           className="px-1 py-0 hover:bg-gray-100"
                         >
                           -
                         </button>
                         <span className="px-1 py-0 border-x">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          onClick={() => dispatch(updateQuantity({ productId: item.id, newQuantity: item.quantity + 1 }))}
                           className="px-1 py-0 hover:bg-gray-100"
                         >
                           +
@@ -62,7 +64,7 @@ function Cart() {
                       </div>
                       <button
                         onClick={() => {
-                          removeFromCart(item.id);
+                          dispatch(removeFromCart(item.id));
                           showToaster(`${item.title} removed from cart`);
                         }}
                         className="text-red-800 hover:text-red-900 transition-colors p-1 flex items-center justify-center"

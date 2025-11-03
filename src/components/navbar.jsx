@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
+import { useSelector } from 'react-redux';
+import { selectCart } from '../redux/cartSlice';
 import Logo from '../assets/bag-icon-white.png';
 
 const NavLinks = ({ onClick, mobile = false }) => {
@@ -51,7 +52,7 @@ const NavLinks = ({ onClick, mobile = false }) => {
 
 function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { cart } = useCart();
+  const cart = useSelector(selectCart);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
